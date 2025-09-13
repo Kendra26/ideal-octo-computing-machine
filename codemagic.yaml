@@ -6,40 +6,61 @@ workflows:
       - name: Install dependencies
         script: |
           sudo apt update
-          sudo apt install -y aria2
+          sudo apt install -y aria2 curl
           mkdir -p downloads
 
       - name: Download torrents
         script: |
           echo "Starting torrent download..."
-          curl -s https://klipit.in/ugq73679 | grep -oE 'magnet:\S+|https?://\S+\.(mp4|mkv|avi|srt)' > links.txt
-          aria2c --seed-time=0 --dir=downloads --file-allocation=none -i links.txt
-          echo "Uploading files to Pixeldrain..."
-          curl -s https://klipit.in/ugq73679 | awk '/Start/{flag=1; next} /Stop/{flag=0} flag' > filenames.txt
-          mapfile -t links < download_links.txt
-          mapfile -t filenames < filenames.txt
-
-            for i in "${!links[@]}"; do
-              link="${links[$i]}"
-              filename="${filenames[$i]}"
-
-              if [[ "$link" == magnet:* ]]; then
-                echo "Skipping magnet link: $link"
-                continue
-              fi
-
-              original_file="./downloads/$(basename "$link")"
-              if [[ -f "$original_file" ]]; then
-                mv "$original_file" "./downloads/$filename"
-                echo "Renamed '$original_file' to './downloads/$filename'"
-              else
-                echo "File '$original_file' not found, skipping."
-              fi
-            done
           
+          # Fetch links (magnet links and media files)
+          curl -s https://klipit.in/ugq73679 | grep -oE 'magnet:\S+|https?://\S+\.(mp4|mkv|avi|srt)' > links.txt
+          
+          # Download files using aria2c
+          aria2c --seed-time=0 --dir=downloads --file-allocation=none -i links.txt
+          
+          echo "Uploading files to Pixeldrain..."
+          
+          # Fetch filenames (assuming the site provides start/stop markers)
+          curl -s https://klipit.in/ugq73679 | awk '/Start/{flag=1; next} /Stop/{flag=0} flag' > filenames.txt
+          
+          # Read links and filenames into arrays
+          mapfile -t links < links.txt
+          mapfile -t filenames < filenames.txt
+          
+          # Loop through links and filenames
+          for i in "${!links[@]}"; do
+            link="${links[$i]}"
+            filename="${filenames[$i]}"
+            
+            # Skip magnet links
+            if [[ "$link" == magnet:* ]]; then
+              echo "Skipping magnet link: $link"
+              continue
+            fi
+            
+            # Check if filename is empty
+            if [[ -z "$filename" ]]; then
+              echo "No filename specified for link: $link, skipping."
+              continue
+            fi
+            
+            # Determine the original file path
+            original_file="./downloads/$(basename "$link")"
+            
+            # Rename the downloaded file if it exists
+            if [[ -f "$original_file" ]]; then
+              mv "$original_file" "./downloads/$filename"
+              echo "Renamed '$original_file' to './downloads/$filename'"
+            else
+              echo "File '$original_file' not found, skipping."
+            fi
+          done
+          
+          # Upload files in the downloads directory
           find downloads -type f -print0 | while IFS= read -r -d '' file; do
-                curl -X POST "https://upload.gofile.io/uploadfile" \
-                     -H "Authorization: Bearer NkEP9nPmjC5bYQB7ZabZKnsUEBi7ww85" \
-                     -F "file=@\"$file\"" \
-                     -F "folderId=33072955-da61-4062-bad6-71f3bc339712"
-              done
+            curl -X POST "https://upload.gofile.io/uploadfile" \
+              -H "Authorization: Bearer NkEP9nPmjC5bYQB7ZabZKnsUEBi7ww85" \
+              -F "file=@\"$file\"" \
+              -F "folderId=33072955-da61-4062-bad6-71f3bc339712"
+          done
