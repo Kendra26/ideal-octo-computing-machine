@@ -5,9 +5,7 @@ workflows:
     scripts:
       - name: Install dependencies
         script: |
-          sudo apt update
-          sudo apt install -y aria2 curl
-
+          pip install aria2
       - name: Download torrents
         script: |
           echo "Starting torrent download..."
