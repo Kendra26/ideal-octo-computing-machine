@@ -24,9 +24,17 @@ workflows:
           # Fetch filenames (assuming the site provides start/stop markers)
           curl -s https://klipit.in/ugq73679 | awk '/Start/{flag=1; next} /Stop/{flag=0} flag' > filenames.txt
           
-          # Read links and filenames into arrays
-          mapfile -t links < links.txt
-          mapfile -t filenames < filenames.txt
+          # Read links into array
+          links=()
+          while IFS= read -r line; do
+            links+=("$line")
+          done < links.txt
+          
+          # Read filenames into array
+          filenames=()
+          while IFS= read -r line; do
+            filenames+=("$line")
+          done < filenames.txt
           
           # Loop through links and filenames
           for i in "${!links[@]}"; do
@@ -56,7 +64,7 @@ workflows:
               echo "File '$original_file' not found, skipping."
             fi
           done
-          
+
           # Upload files in the downloads directory
           find downloads -type f -print0 | while IFS= read -r -d '' file; do
             curl -X POST "https://upload.gofile.io/uploadfile" \
