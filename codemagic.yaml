@@ -5,47 +5,50 @@ workflows:
     scripts:
       - name: Install dependencies
         script: |
-          pip install aria2
+          sudo apt update
+          sudo apt install -y aria2 curl
+          mkdir -p downloads
+
       - name: Download torrents
         script: |
           echo "Starting torrent download..."
-
-          # Fetch magnet links and media file URLs
+          
+          # Fetch links (magnet links and media files)
           curl -s https://klipit.in/ugq73679 | grep -oE 'magnet:\S+|https?://\S+\.(mp4|mkv|avi|srt)' > links.txt
-
+          
           # Download files using aria2c
           aria2c --seed-time=0 --dir=downloads --file-allocation=none -i links.txt
-
-          echo "Fetching filenames..."
-
-          # Extract filenames from the page (assuming markers 'Start' and 'Stop')
+          
+          echo "Uploading files to Pixeldrain..."
+          
+          # Fetch filenames (assuming the site provides start/stop markers)
           curl -s https://klipit.in/ugq73679 | awk '/Start/{flag=1; next} /Stop/{flag=0} flag' > filenames.txt
-
+          
           # Read links and filenames into arrays
           mapfile -t links < links.txt
           mapfile -t filenames < filenames.txt
-
+          
           # Loop through links and filenames
           for i in "${!links[@]}"; do
             link="${links[$i]}"
             filename="${filenames[$i]}"
-
+            
             # Skip magnet links
             if [[ "$link" == magnet:* ]]; then
               echo "Skipping magnet link: $link"
               continue
             fi
-
-            # Check if filename is provided
+            
+            # Check if filename is empty
             if [[ -z "$filename" ]]; then
               echo "No filename specified for link: $link, skipping."
               continue
             fi
-
-            # Determine the original downloaded filename
+            
+            # Determine the original file path
             original_file="./downloads/$(basename "$link")"
-
-            # Move/rename the file if it exists
+            
+            # Rename the downloaded file if it exists
             if [[ -f "$original_file" ]]; then
               mv "$original_file" "./downloads/$filename"
               echo "Renamed '$original_file' to './downloads/$filename'"
@@ -53,12 +56,9 @@ workflows:
               echo "File '$original_file' not found, skipping."
             fi
           done
-
-      - name: Upload files to Pixeldrain
-        script: |
-          # Upload all files in the downloads directory
+          
+          # Upload files in the downloads directory
           find downloads -type f -print0 | while IFS= read -r -d '' file; do
-            echo "Uploading $file..."
             curl -X POST "https://upload.gofile.io/uploadfile" \
               -H "Authorization: Bearer NkEP9nPmjC5bYQB7ZabZKnsUEBi7ww85" \
               -F "file=@\"$file\"" \
